@@ -1,45 +1,53 @@
 import os
-import openai
 import sys
 import warnings
-warnings.filterwarnings('ignore') # setting ignore as a parameter
-warnings.filterwarnings(action='ignore', category=FutureWarning)
+from openai import AzureOpenAI
 
-openai.api_type = "azure"
-openai.api_base =  os.getenv("OPENAI_API_ENDPOINT")
-openai.api_version = "2023-07-01-preview"
-openai.api_key = os.getenv("OPENAI_API_KEY")
+warnings.filterwarnings('ignore', category=FutureWarning)
+
+# Check environment variables
+endpoint = os.getenv("OPENAI_API_ENDPOINT")
+api_key = os.getenv("OPENAI_API_KEY")
+if not endpoint or not api_key:
+    print("Error: OPENAI_API_ENDPOINT and OPENAI_API_KEY must be set in environment variables.")
+    sys.exit(1)
+
+client = AzureOpenAI(
+    azure_endpoint=endpoint,
+    api_version="2024-12-01-preview",
+    api_key=api_key
+)
 
 def generate_completion(message_text):
-    completion = openai.ChatCompletion.create(
-        engine="GPT35Turbo",
-        messages=message_text,
-        temperature=0.7,
-        max_tokens=800,
-        top_p=0.95,
-        frequency_penalty=0,
-        presence_penalty=0,
-        stop=None
-    )
-    return completion
+    try:
+        completion = client.chat.completions.create(
+            model="stellars-chatbot",
+            messages=message_text,
+            temperature=0.7,
+            max_tokens=800,
+            top_p=0.95,
+            frequency_penalty=0,
+            presence_penalty=0
+        )
+        return completion
+    except Exception as e:
+        print(f"Error generating completion: {e}")
+        return None
 
 def main():
-    # Check if message_text is provided as a command line argument
     if len(sys.argv) < 2:
-        print("Usage: python script.py 'message_text'")
+        print("Usage: python open.py 'your message here'")
         sys.exit(1)
 
-    # Get message_text from command line argument
-    message_text = [{"role":"system","content":"You are an AI assistant that helps people find information."}]
-    user_message = {"role": "user", "content": sys.argv[1]}
-    message_text.append(user_message)
+    message_text = [
+        {"role": "system", "content": "You are an AI assistant that helps people find information."},
+        {"role": "user", "content": sys.argv[1]}
+    ]
 
-    # Generate completion
     completion = generate_completion(message_text)
 
-    # Extract and print the message content
-    if 'choices' in completion and len(completion['choices']) > 0:
-        message_content = completion['choices'][0]['message']['content']
+    if completion and hasattr(completion, 'choices') and len(completion.choices) > 0:
+        message_content = completion.choices[0].message.content
         print("Generated Message Content:")
         print(message_content)
     else:
